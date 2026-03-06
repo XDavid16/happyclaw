@@ -339,6 +339,8 @@ export function initDatabase(): void {
     })();
   }
 
+  // v19→v20 migration: add token_usage column to messages
+  ensureColumn('messages', 'token_usage', 'TEXT');
   assertSchema('messages', [
     'id',
     'chat_jid',
@@ -350,8 +352,6 @@ export function initDatabase(): void {
     'attachments',
     'token_usage',
   ]);
-  // v19→v20 migration: add token_usage column to messages
-  ensureColumn('messages', 'token_usage', 'TEXT');
   assertSchema('scheduled_tasks', [
     'id',
     'group_folder',
