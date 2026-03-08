@@ -131,16 +131,31 @@ function extractMessageContent(
       const lines: string[] = [];
       const imageKeys: string[] = [];
       const post = parsed.post;
-      if (!post) return { text: '' };
+      if (!post) {
+        logger.warn({ keys: Object.keys(parsed) }, 'Empty post object in post message');
+        return { text: '' };
+      }
 
       // Try zh_cn first, then en_us, then other languages
       const contentData = post.zh_cn || post.en_us || Object.values(post)[0];
-      if (!contentData || !Array.isArray(contentData.content)) return { text: '' };
+      if (!contentData || !Array.isArray(contentData.content)) {
+        logger.warn({ keys: Object.keys(post) }, 'Missing content array in post message');
+        return { text: '' };
+      }
+
+      // Include post title if present
+      if (contentData.title && typeof contentData.title === 'string') {
+        lines.push(contentData.title);
+      }
 
       for (const paragraph of contentData.content) {
-        if (!Array.isArray(paragraph)) continue;
+        // Handle both array paragraphs and flat object segments
+        const segments = Array.isArray(paragraph)
+          ? paragraph
+          : (paragraph && typeof paragraph === 'object' ? [paragraph] : null);
+        if (!segments) continue;
         const parts: string[] = [];
-        for (const segment of paragraph) {
+        for (const segment of segments) {
           if (!segment || typeof segment !== 'object') continue;
           if (segment.tag === 'text' && typeof segment.text === 'string') {
             parts.push(segment.text);
@@ -159,6 +174,8 @@ function extractMessageContent(
           } else if (segment.tag === 'img' && typeof segment.image_key === 'string') {
             imageKeys.push(segment.image_key);
             parts.push('[图片]');
+          } else if (segment.tag === 'media') {
+            parts.push('[视频]');
           } else if (segment.tag === 'emotion' && typeof segment.emoji_type === 'string') {
             parts.push(`:${segment.emoji_type}:`);
           } else if (typeof segment.text === 'string') {
