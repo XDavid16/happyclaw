@@ -1029,11 +1029,17 @@ function createPreCompactHook(deps: {
   emit: (output: ContainerOutput) => void;
   getFullText: () => string;
   resetFullText: () => void;
+  onCompactionStart?: () => void;
 }): HookCallback {
   return async (input, _toolUseId, _context) => {
     const preCompact = input as PreCompactHookInput;
     const transcriptPath = preCompact.transcript_path;
     const sessionId = preCompact.session_id;
+
+    // Compaction is a legitimate long model round-trip, not a stalled provider.
+    // Suspend the first-response watchdog before it can misfire during the
+    // summarization request (which emits nothing to the outer SDK iterator).
+    deps.onCompactionStart?.();
 
     // Skip sub-agent compactions — they'd archive the unchanged main transcript
     // and set hadCompaction, triggering a spurious main-session auto-continue.
@@ -2660,6 +2666,7 @@ async function runQueryAttempt(
                 emit,
                 getFullText: () => processor.getFullText(),
                 resetFullText: () => processor.resetFullTextAccumulator(),
+                onCompactionStart: () => firstResponseWatchdog?.pause(),
               }),
             ],
           },

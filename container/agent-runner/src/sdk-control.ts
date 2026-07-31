@@ -66,6 +66,20 @@ export class SdkFirstResponseWatchdog {
     this.clear();
   }
 
+  /**
+   * Suspend the first-response deadline for a known-legitimate long operation.
+   * An auto-compaction is a full model round-trip that summarizes the whole
+   * conversation; on a near-full context it can easily exceed the first-response
+   * budget while emitting no `assistant`/`stream_event`/`result` to the outer
+   * iterator. Without this, a slow compaction is misclassified as a stalled
+   * provider and surfaced as a terminal "provider exhausted" failure. The real
+   * post-compaction model response still clears the guard via observe().
+   */
+  pause(): void {
+    if (this.observed) return;
+    this.clear();
+  }
+
   clear(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;

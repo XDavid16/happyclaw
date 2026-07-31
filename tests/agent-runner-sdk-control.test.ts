@@ -83,6 +83,30 @@ describe('agent-runner SDK control requests', () => {
     },
   );
 
+  test('pause() suspends the deadline for a long compaction round-trip', async () => {
+    vi.useFakeTimers();
+    try {
+      const onTimeout = vi.fn();
+      const watchdog = new SdkFirstResponseWatchdog(60_000, onTimeout);
+
+      // Compaction starts early in the turn (PreCompact) before the budget
+      // elapses; the summarization request itself emits no first-response.
+      await vi.advanceTimersByTimeAsync(3_000);
+      watchdog.pause();
+
+      // A slow compaction can far exceed the original first-response budget.
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(onTimeout).not.toHaveBeenCalled();
+
+      // The real post-compaction model response still clears the guard.
+      watchdog.observe('assistant');
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(onTimeout).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test('does not treat a non-terminal rate-limit warning as a model response', () => {
     vi.useFakeTimers();
     try {
