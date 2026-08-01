@@ -1544,6 +1544,13 @@ function buildContainerArgs(
   // Set timezone so container Node.js processes use local time (Asia/Shanghai)
   args.push('-e', `TZ=${tz}`);
 
+  // Pass host UID/GID so the entrypoint can remap the container `node` user
+  // to match the host backend user. Without this, files created by the
+  // container (node/uid 1000) are owned by a different user on the host and
+  // Claude SDK's 0600 transcript files become unreadable by the host backend.
+  args.push('-e', `HOST_UID=${process.getuid!()}`);
+  args.push('-e', `HOST_GID=${process.getgid!()}`);
+
   // Docker: -v with :ro suffix for readonly
   for (const mount of mounts) {
     if (mount.readonly) {
