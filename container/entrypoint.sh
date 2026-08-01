@@ -6,6 +6,20 @@ set -e
 # Without this, the host cannot delete/modify files created by the container.
 umask 0000
 
+# Remap the container `node` user's UID/GID to match the host backend user.
+# Claude SDK creates session transcript files with mode 0600 (owner-only).
+# Without UID remapping, these files are owned by uid 1000 (ubuntu on host)
+# and unreadable by the host backend (agent, uid 1002). Remapping makes the
+# container user and host user the same identity, so 0600 files remain
+# accessible to the host even if the cleanup trap is skipped (docker kill).
+HOST_UID=${HOST_UID:-1000}
+HOST_GID=${HOST_GID:-1000}
+if [ "$(id -u node)" != "$HOST_UID" ]; then
+  sed -i "s/^node:x:[0-9]*:[0-9]*/node:x:${HOST_UID}:${HOST_GID}/" /etc/passwd
+  sed -i "s/^node:x:[0-9]*/node:x:${HOST_GID}/" /etc/group
+  chown -R "${HOST_UID}:${HOST_GID}" /home/node 2>/dev/null || true
+fi
+
 # Fix ownership on mounted volumes.
 # Host uid may differ from container node user (uid 1000), especially in
 # rootless podman where uid remapping causes EACCES on bind mounts.
